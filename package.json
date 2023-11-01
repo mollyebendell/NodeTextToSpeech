@@ -1,0 +1,15 @@
+{
+  "name": "node-text-to-speech",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "NodeTextToSpeech",
+  "main": "app.js",
+  "author": {
+    "name": ""
+  },
+  "dependencies": {
+    "@google-cloud/local-auth": "^2.1.0",
+    "googleapis": "^105.0.0",
+    "node-fetch": "^3.3.2"
+  }
+}
