@@ -6,6 +6,13 @@ let yes_String = "Votes for yes, she was committed: ";
 let no_String = "Votes for no, she was not committed: ";
 let speechify_String = "";
 
+let setup_sheetID = "1Hpq1SvT1u0A-fz2Th7tvFN8M_3z4T3FSa0a_kdkNGQM";
+let yes_sheetID = "";
+let no_sheetID = "";
+
+let yes_cellCount = 1;
+let no_cellCount = 1;
+
 //needed to run
 const require = createRequire(import.meta.url);
 
@@ -82,25 +89,39 @@ async function authorize() {
 /**
  * @param {google.auth.OAuth2} auth The authenticated Google OAuth client.
  */
-async function listMajors(auth) {
+async function getFeedback(auth) {
     const sheets = google.sheets({ version: 'v4', auth });
+    const setupSheet = await sheets.spreadsheets.values.get({
+        spreadsheetId: setup_sheetID,
+        range: 'Sheet1!B:B',
+    });
+    //assign the yes and no sheets to B1 and B2 set up sheet values
+    yes_sheetID = setupSheet.data.values[0];
+    no_sheetID = setupSheet.data.values[1];
+    //assign the yes and no counter vals to B4 and B5 set up sheet values
+    yes_cellCount = setupSheet.data.values[3];
+    yes_cellCount = setupSheet.data.values[4];
     const yesSheet = await sheets.spreadsheets.values.get({
-        spreadsheetId: '1x6G9RKkppzxWU17Gj9yENw0fVAIs1y0-mkZ4Hk0tb3g',
-        range: 'Sheet1!B:C',
+        spreadsheetId: yes_sheetID,
+        range: 'Sheet1!B' + yes_cellCount + ':C',
     });
     const yesRows = yesSheet.data.values;
     if (!yesRows || yesRows.length === 0) {
         console.log('No data found.');
         return;
     }
+    console.log("setup sheet id: " + setup_sheetID);
+    console.log("yes sheet id: " + yes_sheetID);
+    console.log("no sheet id: " + no_sheetID);
     console.log('Yes Answers');
     yesRows.forEach((row) => {
         yes_String += `${row[0]}, `;
+        yes_cellCount++;
     });
     console.log(yes_String);
     const noSheet = await sheets.spreadsheets.values.get({
-        spreadsheetId: '1r5zaEKEOqOjXsthB5c-RDaFPEjZXmXfhdo0XYTA_v2g',
-        range: 'Sheet1!B:C',
+        spreadsheetId: no_sheetID,
+        range: 'Sheet1!B' + no_cellCount + ':C',
     });
     const noRows = noSheet.data.values;
     if (!noRows || noRows.length === 0) {
@@ -110,12 +131,21 @@ async function listMajors(auth) {
     console.log('No Answers');
     noRows.forEach((row) => {
         no_String += `${row[0]}, `;
+        no_cellCount++;
     });
     console.log(no_String);
     speechify_String = yes_String + ". " + no_String;
+    await sheets.spreadsheets.values.update({
+        auth: auth,
+        spreadsheetId: setup_sheetID,
+        range: "Sheet1!B4:B5",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[yes_cellCount, no_cellCount]] },
+    });
+
 }
 
-authorize().then(listMajors).catch(console.error);
+authorize().then(getFeedback).catch(console.error);
 
 async function clone_voice() {
     const url = BASE + '/voice';
