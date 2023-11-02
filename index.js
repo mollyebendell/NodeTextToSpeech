@@ -138,9 +138,9 @@ async function getFeedback(auth) {
     await sheets.spreadsheets.values.update({
         auth: auth,
         spreadsheetId: setup_sheetID,
-        range: "Sheet1!B4:5",
+        range: "B4:B5",
         valueInputOption: "USER_ENTERED",
-        requestBody: { values: [[yes_cellCount, no_cellCount]] },
+        requestBody: { values: [[yes_cellCount], [no_cellCount]] },
     });
 
 }
