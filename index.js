@@ -26,7 +26,7 @@ const process = require('process');
 const { authenticate } = require('@google-cloud/local-auth');
 const { google } = require('googleapis');
 // If modifying these scopes, delete token.json.
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'];
 // The file token.json stores the user's access and refresh tokens, and is
 // created automatically when the authorization flow completes for the first
 // time.
@@ -138,7 +138,7 @@ async function getFeedback(auth) {
     await sheets.spreadsheets.values.update({
         auth: auth,
         spreadsheetId: setup_sheetID,
-        range: "Sheet1!B4:B5",
+        range: "Sheet1!B4:5",
         valueInputOption: "USER_ENTERED",
         requestBody: { values: [[yes_cellCount, no_cellCount]] },
     });
