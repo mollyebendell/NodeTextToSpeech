@@ -100,6 +100,7 @@ async function getFeedback(auth) {
     //assign the yes and no sheets to B1 and B2 set up sheet values
     yes_sheetID = setupSheet.data.values[0];
     no_sheetID = setupSheet.data.values[1];
+    //assign file path
     outputPath = setupSheet.data.values[5].toString();
     //assign the yes and no counter vals to B4 and B5 set up sheet values
     yes_cellCount = setupSheet.data.values[3];
