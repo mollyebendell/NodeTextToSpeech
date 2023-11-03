@@ -1,39 +1,44 @@
 import fetch, { FormData, fileFrom } from 'node-fetch';
-import { createRequire } from "module";
+import https from 'https';
+import { google } from 'googleapis';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegPath from '@ffmpeg-installer/ffmpeg';
+import { createRequire } from 'module';
+import path from 'path';
+import process from 'process';
+// import { promises as fs } from 'fs';
 
-//mollyes variables
+import fs from 'fs';
+const fsp = fs.promises;
+
+import pkg from 'google-auth-library';
+const { authenticate } = pkg;
+
+// Setting path for ffmpeg to work with fluent-ffmpeg
+ffmpeg.setFfmpegPath(ffmpegPath.path);
+
+// Your Speechify API Key
+const API_KEY = 'hfZsWNToSDmwALSiip9PeLtBLAxwfqz6'; // Replace with your actual API key
+const BASE = 'https://myvoice.speechify.com/api';
+
+// Google Sheets and Drive API configuration
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'];
+const TOKEN_PATH = path.join(process.cwd(), 'token.json');
+const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+
+// Your variables
 let yes_String = "Votes for yes, she was committed: ";
 let no_String = "Votes for no, she was not committed: ";
 let speechify_String = "";
-
 let outputPath = "";
-
 let setup_sheetID = "1Hpq1SvT1u0A-fz2Th7tvFN8M_3z4T3FSa0a_kdkNGQM";
 let yes_sheetID = "";
 let no_sheetID = "";
-
 let yes_cellCount = 1;
 let no_cellCount = 1;
 
-//needed to run
+// Needed to use require in ES6 module
 const require = createRequire(import.meta.url);
-
-//speechify auth
-const API_KEY = 'hfZsWNToSDmwALSiip9PeLtBLAxwfqz6 ' // YOUR API KEY HERE
-const BASE = 'https://myvoice.speechify.com/api'
-//google sheets auth
-const fs = require('fs').promises;
-const path = require('path');
-const process = require('process');
-const { authenticate } = require('@google-cloud/local-auth');
-const { google } = require('googleapis');
-// If modifying these scopes, delete token.json.
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'];
-// The file token.json stores the user's access and refresh tokens, and is
-// created automatically when the authorization flow completes for the first
-// time.
-const TOKEN_PATH = path.join(process.cwd(), 'token.json');
-const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
 
 /**
  * Reads previously authorized credentials from the save file.
@@ -42,7 +47,7 @@ const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
  */
 async function loadSavedCredentialsIfExist() {
     try {
-        const content = await fs.readFile(TOKEN_PATH);
+        const content = await fsp.readFile(TOKEN_PATH); // Updated to use fsp
         const credentials = JSON.parse(content);
         return google.auth.fromJSON(credentials);
     } catch (err) {
@@ -57,7 +62,7 @@ async function loadSavedCredentialsIfExist() {
  * @return {Promise<void>}
  */
 async function saveCredentials(client) {
-    const content = await fs.readFile(CREDENTIALS_PATH);
+    const content = await fsp.readFile(CREDENTIALS_PATH); // Updated to use fsp
     const keys = JSON.parse(content);
     const key = keys.installed || keys.web;
     const payload = JSON.stringify({
@@ -66,7 +71,7 @@ async function saveCredentials(client) {
         client_secret: key.client_secret,
         refresh_token: client.credentials.refresh_token,
     });
-    await fs.writeFile(TOKEN_PATH, payload);
+    await fsp.writeFile(TOKEN_PATH, payload); // Updated to use fsp
 }
 
 /**
@@ -175,12 +180,62 @@ async function clone_voice() {
     return voice
 }
 
+function splitIntoChunks(text, chunkSize) {
+    const chunks = [];
+  
+    while (text.length > 0) {
+      let endIndex = chunkSize;
+      if (text.length > chunkSize) {
+        while (text[endIndex] !== ' ' && endIndex > 0) {
+          endIndex--;
+        }
+      }
+      chunks.push(text.substring(0, endIndex).trim());
+      text = text.substring(endIndex).trim();
+    }
+  
+    return chunks;
+  }
+  
+  async function downloadAudio(url, path) {
+    return new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(path);
+      https.get(url, (response) => {
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          resolve();
+        });
+      }).on('error', (err) => {
+        fs.unlink(path, () => {}); // Delete the file async. Ignore error.
+        reject(err);
+      });
+    });
+  }
+  
+  function concatenateAudio(files, outputPath) {
+    return new Promise((resolve, reject) => {
+      const command = ffmpeg();
+  
+      files.forEach(file => {
+        command.input(file);
+      });
+  
+      command
+        .on('error', (err) => {
+          reject(err);
+        })
+        .on('end', () => {
+          resolve(outputPath);
+        })
+        .mergeToFile(outputPath, './temp_directory');
+    });
+  }
 
-async function tts(voice) {
-    const url_0 = BASE + '/tts/clone';
-
+  async function tts(voice, textChunk) {
+    const url = BASE + '/tts/clone';
     const form = new FormData();
-    form.append('text', speechify_String);
+    form.append('text', textChunk);
     form.append('voice_id', voice.id);
     form.append('stability', '0.75');
     form.append('clarity', '0.75');
@@ -190,35 +245,59 @@ async function tts(voice) {
         'x-api-key': API_KEY,
     };
 
-    const response = await fetch(url_0, {
+    const response = await fetch(url, {
         method: 'POST',
         headers: headers,
         body: form,
     });
 
     const result = await response.json();
-    const mp3_url = result.url;
-    const http = require('https'); // or 'https' for https:// URLs
-    const fs = require('fs');
-
-    const file = fs.createWriteStream(outputPath);
-    const request = http.get(mp3_url, function (response) {
-        response.pipe(file);
-
-        // after download completed close filestreams
-        file.on("finish", () => {
-            file.close();
-            console.log("Download Completed");
-        });
-    });
-    console.log(result);
-    console.log(mp3_url);
-    return result
+    return result;
 }
 
 const main = async () => {
-    const voice = await clone_voice();
-    await tts(voice);
-}
+  const voice = await clone_voice();
+  const chunks = splitIntoChunks(speechify_String, 2000); // Change the chunk size if needed
+  const audioFiles = [];
 
-main()
+  for (const chunk of chunks) {
+    const ttsResult = await tts(voice, chunk);
+    const audioPath = `audio_chunk_${chunks.indexOf(chunk)}.mp3`;
+    await downloadAudio(ttsResult.url, audioPath);
+    audioFiles.push(audioPath);
+  }
+
+  // Check if the audio files are accessible and log them
+  console.log('Audio files to be concatenated:', audioFiles);
+  for (const file of audioFiles) {
+    try {
+      await fsp.access(file, fs.constants.R_OK);
+      console.log(`File ${file} is readable.`);
+    } catch (err) {
+      console.error(`Error accessing file ${file}:`, err.message);
+    }
+  }
+
+  // Define the final output path using the outputPath variable from the spreadsheet
+  const finalOutputPath = path.join(outputPath, 'feedback.mp3');
+
+  // Proceed with concatenation if all files are readable
+  try {
+    await concatenateAudio(audioFiles, finalOutputPath);
+    console.log(`Concatenated audio available at: ${finalOutputPath}`);
+  } catch (error) {
+    console.error('An error occurred during concatenation:', error);
+  }
+
+  // Cleanup
+  for (const file of audioFiles) {
+      try {
+        await fsp.unlink(file); // Updated to use fsp
+        console.log(`Deleted file: ${file}`);
+      } catch (err) {
+        console.error(`Error deleting file ${file}:`, err.message);
+      }
+  }
+};
+
+main().catch(console.error);
