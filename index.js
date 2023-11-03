@@ -6,6 +6,8 @@ let yes_String = "Votes for yes, she was committed: ";
 let no_String = "Votes for no, she was not committed: ";
 let speechify_String = "";
 
+let outputPath = "";
+
 let setup_sheetID = "1Hpq1SvT1u0A-fz2Th7tvFN8M_3z4T3FSa0a_kdkNGQM";
 let yes_sheetID = "";
 let no_sheetID = "";
@@ -98,12 +100,13 @@ async function getFeedback(auth) {
     //assign the yes and no sheets to B1 and B2 set up sheet values
     yes_sheetID = setupSheet.data.values[0];
     no_sheetID = setupSheet.data.values[1];
+    outputPath = setupSheet.data.values[5].toString();
     //assign the yes and no counter vals to B4 and B5 set up sheet values
     yes_cellCount = setupSheet.data.values[3];
-    yes_cellCount = setupSheet.data.values[4];
+    no_cellCount = setupSheet.data.values[4];
     const yesSheet = await sheets.spreadsheets.values.get({
         spreadsheetId: yes_sheetID,
-        range: 'Sheet1!B' + yes_cellCount + ':C',
+        range: 'Sheet1!B' + yes_cellCount + ':B',
     });
     const yesRows = yesSheet.data.values;
     if (!yesRows || yesRows.length === 0) {
@@ -121,7 +124,7 @@ async function getFeedback(auth) {
     console.log(yes_String);
     const noSheet = await sheets.spreadsheets.values.get({
         spreadsheetId: no_sheetID,
-        range: 'Sheet1!B' + no_cellCount + ':C',
+        range: 'Sheet1!B' + no_cellCount + ':B',
     });
     const noRows = noSheet.data.values;
     if (!noRows || noRows.length === 0) {
@@ -197,7 +200,7 @@ async function tts(voice) {
     const http = require('https'); // or 'https' for https:// URLs
     const fs = require('fs');
 
-    const file = fs.createWriteStream("C:/Users/mbend/Downloads/personal/portfolio - studio/COMMIT/LipSync_TestApp/Assets/audio/feedback.mp3");
+    const file = fs.createWriteStream(outputPath);
     const request = http.get(mp3_url, function (response) {
         response.pipe(file);
 
